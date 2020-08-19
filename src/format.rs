@@ -69,26 +69,17 @@ mod tests {
     }
 
     #[test]
-    fn num_storage_bits_single() {
-        let f = Format::new(8, 23);
-        assert_eq!(f.num_storage_bits(), 32);
-    }
+    fn num_storage_bits() {
+        let single = Format::new(8, 23);
+        assert_eq!(single.num_storage_bits(), 32);
 
-    #[test]
-    fn num_storage_bits_half() {
-        let f = Format::new(5, 10);
-        assert_eq!(f.num_storage_bits(), 16);
-    }
+        let half = Format::new(5, 10);
+        assert_eq!(half.num_storage_bits(), 16);
 
-    #[test]
-    fn num_storage_bits_bfloat16() {
-        let f = Format::new(8, 7);
-        assert_eq!(f.num_storage_bits(), 16);
-    }
+        let bfloat16 = Format::new(8, 7);
+        assert_eq!(bfloat16.num_storage_bits(), 16);
 
-    #[test]
-    fn num_storage_bits_fp24() {
-        let f = Format::new(7, 16);
-        assert_eq!(f.num_storage_bits(), 24);
+        let fp24 = Format::new(7, 16);
+        assert_eq!(fp24.num_storage_bits(), 24);
     }
 }
