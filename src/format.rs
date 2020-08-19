@@ -27,14 +27,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_valid_format_0() {
+    fn new_valid_format() {
         let f = Format::new(8, 23);
         assert_eq!(f.num_exp_bits, 8);
         assert_eq!(f.num_sig_bits, 23);
-    }
 
-    #[test]
-    fn new_valid_format_1() {
         let f = Format::new(10, 10);
         assert_eq!(f.num_exp_bits, 10);
         assert_eq!(f.num_sig_bits, 10);
