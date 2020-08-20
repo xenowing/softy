@@ -5,6 +5,11 @@ pub struct Format {
 
 impl Format {
     pub fn new(num_exp_bits: u32, num_sig_bits: u32) -> Format {
+        let min_exp_bits = 2;
+        if num_exp_bits < min_exp_bits {
+            panic!("Requested format must have at least 2 exponent bits.");
+        }
+
         let num_storage_bits = 1 + num_exp_bits + num_sig_bits;
         let max_storage_bits = 32;
         if num_storage_bits > max_storage_bits {
@@ -38,6 +43,20 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "Requested format must have at least 2 exponent bits.")]
+    fn new_not_enough_exp_bits_0() {
+        // Panic
+        let _ = Format::new(0, 33);
+    }
+
+    #[test]
+    #[should_panic(expected = "Requested format must have at least 2 exponent bits.")]
+    fn new_not_enough_exp_bits_1() {
+        // Panic
+        let _ = Format::new(1, 14);
+    }
+
+    #[test]
     #[should_panic(expected = "Requested format requires 33 storage bits, which exceeds the maximum storage bit width of 32 bits.")]
     fn new_exceeded_storage_bit_width_0() {
         // Panic
@@ -48,7 +67,7 @@ mod tests {
     #[should_panic(expected = "Requested format requires 33 storage bits, which exceeds the maximum storage bit width of 32 bits.")]
     fn new_exceeded_storage_bit_width_1() {
         // Panic
-        let _ = Format::new(1, 31);
+        let _ = Format::new(2, 30);
     }
 
     #[test]
@@ -62,7 +81,7 @@ mod tests {
     #[should_panic(expected = "Requested format requires 1338 storage bits, which exceeds the maximum storage bit width of 32 bits.")]
     fn new_exceeded_storage_bit_width_3() {
         // Panic
-        let _ = Format::new(0, 1337);
+        let _ = Format::new(2, 1335);
     }
 
     #[test]
