@@ -15,8 +15,6 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     if source1.exp < source2.exp {
         mem::swap(&mut source1, &mut source2);
     }
-    let source1 = source1;
-    let source2 = source2;
 
     let format = &source1.format;
 
@@ -35,11 +33,17 @@ pub fn addition(source1: Value, source2: Value) -> Value {
         }
     }
 
+    // If sources' signs differ, negate rhs sig via two's complement
+    let sig_including_hidden_and_overflow_bits_mask = (1 << (format.num_sig_bits + 2)) - 1;
+    if source1.sign != source2.sign {
+        source2_sig = (!source2_sig + 1) & sig_including_hidden_and_overflow_bits_mask;
+    }
+
     // Calculate sum
     let sum_sign = source1.sign;
     let mut sum_exp = source1.exp;
-    let mut sum_sig = source1_sig + source2_sig;
-    let is_sum_zero = sum_exp == 0;
+    let mut sum_sig = (source1_sig + source2_sig) & sig_including_hidden_and_overflow_bits_mask;
+    let is_sum_zero = sum_exp == 0 || sum_sig == 0;
 
     // Normalize sum
     let sum_sig_overflow = ((sum_sig >> (format.num_sig_bits + 1)) & 1) != 0;
@@ -47,6 +51,8 @@ pub fn addition(source1: Value, source2: Value) -> Value {
         sum_exp += 1;
         sum_sig >>= 1;
     }
+
+    // TODO: Handle cancellation cases from negative rhs
 
     // Remove hidden bit from sum
     let sum_sig = sum_sig & ((1 << format.num_sig_bits) - 1);
@@ -180,6 +186,13 @@ mod tests {
 
         let a = Value::from_comps(true, 127, 0, f.clone()); // -1.0
         let b = Value::from_comps(false, 127, 0, f.clone()); // 1.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x00000000); // 0.0
+
+        let a = Value::from_comps(true, 0, 0, f.clone()); // -0.0
+        let b = Value::from_comps(false, 0, 0, f.clone()); // 0.0
 
         let res = addition(a, b);
 
