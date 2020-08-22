@@ -1,6 +1,7 @@
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Format {
-    num_exp_bits: u32,
-    num_sig_bits: u32,
+    pub(crate) num_exp_bits: u32,
+    pub(crate) num_sig_bits: u32,
 }
 
 impl Format {
@@ -20,6 +21,10 @@ impl Format {
             num_exp_bits,
             num_sig_bits,
         }
+    }
+
+    pub fn ieee754_single() -> Format {
+        Format::new(8, 23)
     }
 
     pub fn num_storage_bits(&self) -> u32 {
@@ -85,8 +90,15 @@ mod tests {
     }
 
     #[test]
+    fn ieee754_single() {
+        let format = Format::ieee754_single();
+        assert_eq!(format.num_exp_bits, 8);
+        assert_eq!(format.num_sig_bits, 23);
+    }
+
+    #[test]
     fn num_storage_bits() {
-        let single = Format::new(8, 23);
+        let single = Format::ieee754_single();
         assert_eq!(single.num_storage_bits(), 32);
 
         let half = Format::new(5, 10);
