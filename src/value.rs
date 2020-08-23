@@ -25,4 +25,43 @@ impl Value {
         let sig = self.sig;
         sign | exp | sig
     }
+
+    pub fn is_nan(&self) -> bool {
+        self.exp == self.format.exp_max() && self.sig != 0
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_nan() {
+        let f = Format::ieee754_single();
+
+        let x = Value::from_comps(false, 127, 0, f.clone()); // 1.0
+
+        assert_eq!(x.is_nan(), false);
+
+        let x = Value::from_comps(false, 128, 0, f.clone()); // 2.0
+
+        assert_eq!(x.is_nan(), false);
+
+        let x = Value::from_comps(false, 255, 0, f.clone()); // +inf
+
+        assert_eq!(x.is_nan(), false);
+
+        let x = Value::from_comps(false, 255, 1, f.clone()); // NaN
+
+        assert_eq!(x.is_nan(), true);
+
+        let x = Value::from_comps(false, 255, 1337, f.clone()); // NaN
+
+        assert_eq!(x.is_nan(), true);
+
+        let x = Value::from_comps(true, 255, 1337, f.clone()); // -NaN
+
+        assert_eq!(x.is_nan(), true);
+    }
 }

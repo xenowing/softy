@@ -19,7 +19,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     let sig_quiet_bit = 1 << (format.num_sig_bits - 1);
     let quiet_nan = Value::from_comps(false, format.exp_max(), sig_quiet_bit, format.clone());
 
-    if is_nan(&source1) || is_nan(&source2) {
+    if source1.is_nan() || source2.is_nan() {
         return quiet_nan;
     }
 
@@ -81,11 +81,6 @@ pub fn addition(source1: Value, source2: Value) -> Value {
         let sum_sig = sum_sig & ((1 << format.num_sig_bits) - 1);
         Value::from_comps(sum_sign, sum_exp, sum_sig, format.clone())
     }
-}
-
-fn is_nan(value: &Value) -> bool {
-    let exp_max = value.format.exp_max();
-    value.exp == exp_max && value.sig != 0
 }
 
 fn is_inf(value: &Value) -> bool {
