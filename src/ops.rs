@@ -24,7 +24,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     }
 
     // TODO: Is this case really important?
-    if is_inf(&source1) && is_inf(&source2) && source1.sign != source2.sign {
+    if source1.is_inf() && source2.is_inf() && source1.sign != source2.sign {
         return quiet_nan;
     }
 
@@ -63,7 +63,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     }
 
     // Check for infinity (exp overflow)
-    let is_inf = sum_exp >= format.exp_max();
+    let is_sum_inf = sum_exp >= format.exp_max();
 
     // Normalize sum in case of cancellations from potentially-negative rhs
     let sum_sig_leading_zeros = sum_sig.leading_zeros() - (32 - (format.num_sig_bits + 1));
@@ -71,7 +71,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     let is_sum_zero = is_sum_zero || sum_sig_leading_zeros >= sum_exp;
     sum_exp = sum_exp.wrapping_sub(sum_sig_leading_zeros);
 
-    if is_inf {
+    if is_sum_inf {
         Value::from_comps(sum_sign, format.exp_max(), 0, format.clone())
     } else if is_sum_zero {
         // TODO: Handle sign properly (or not? :) )
@@ -81,11 +81,6 @@ pub fn addition(source1: Value, source2: Value) -> Value {
         let sum_sig = sum_sig & ((1 << format.num_sig_bits) - 1);
         Value::from_comps(sum_sign, sum_exp, sum_sig, format.clone())
     }
-}
-
-fn is_inf(value: &Value) -> bool {
-    let exp_max = value.format.exp_max();
-    value.exp == exp_max && value.sig == 0
 }
 
 fn flush_denormal_to_zero(value: Value) -> Value {

@@ -29,6 +29,10 @@ impl Value {
     pub fn is_nan(&self) -> bool {
         self.exp == self.format.exp_max() && self.sig != 0
     }
+
+    pub fn is_inf(&self) -> bool {
+        self.exp == self.format.exp_max() && self.sig == 0
+    }
 }
 
 
@@ -63,5 +67,38 @@ mod tests {
         let x = Value::from_comps(true, 255, 1337, f.clone()); // -NaN
 
         assert_eq!(x.is_nan(), true);
+    }
+
+    #[test]
+    fn is_inf() {
+        let f = Format::ieee754_single();
+
+        let x = Value::from_comps(false, 127, 0, f.clone()); // 1.0
+
+        assert_eq!(x.is_inf(), false);
+
+        let x = Value::from_comps(false, 128, 0, f.clone()); // 2.0
+
+        assert_eq!(x.is_inf(), false);
+
+        let x = Value::from_comps(false, 255, 1, f.clone()); // NaN
+
+        assert_eq!(x.is_inf(), false);
+
+        let x = Value::from_comps(false, 255, 1337, f.clone()); // NaN
+
+        assert_eq!(x.is_inf(), false);
+
+        let x = Value::from_comps(true, 255, 1337, f.clone()); // -NaN
+
+        assert_eq!(x.is_inf(), false);
+
+        let x = Value::from_comps(false, 255, 0, f.clone()); // +inf
+
+        assert_eq!(x.is_inf(), true);
+
+        let x = Value::from_comps(true, 255, 0, f.clone()); // -inf
+
+        assert_eq!(x.is_inf(), true);
     }
 }
