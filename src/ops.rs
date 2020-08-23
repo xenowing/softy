@@ -9,8 +9,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     let mut source1 = flush_denormal_to_zero(source1);
     let mut source2 = flush_denormal_to_zero(source2);
 
-    // Ensure source with greater exponent is lhs
-    // TODO: Is this sig part necessary?
+    // Ensure source with greater magnitude is lhs
     if source1.exp < source2.exp || (source1.exp == source2.exp && source1.sig < source2.sig) {
         mem::swap(&mut source1, &mut source2);
     }
@@ -35,7 +34,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     let source1_sig = hidden_bit | source1.sig;
     let mut source2_sig = hidden_bit | source2.sig;
 
-    // Align rhs exponent (if applicable)
+    // Align rhs point (if applicable)
     if source2.exp < source1.exp {
         let shift_digits = source1.exp - source2.exp;
         if shift_digits > format.num_sig_bits {
@@ -57,7 +56,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     let mut sum_sig = (source1_sig + source2_sig) & sig_including_hidden_and_overflow_bits_mask;
     let is_sum_zero = sum_exp == 0 || sum_sig == 0;
 
-    // Normalize sum
+    // Normalize sum in case of hidden bit overflow
     let sum_sig_overflow = ((sum_sig >> (format.num_sig_bits + 1)) & 1) != 0;
     if sum_sig_overflow {
         sum_exp += 1;
@@ -67,15 +66,11 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     // Check for infinity (exp overflow)
     let is_inf = sum_exp >= exp_max;
 
-    // Handle cancellation cases from negative rhs
-    // TODO: Surely this can be simplified and/or perhaps merged with normalization above
+    // Normalize sum in case of cancellations from potentially-negative rhs
     let sum_sig_leading_zeros = sum_sig.leading_zeros() - (32 - (format.num_sig_bits + 1));
     sum_sig <<= sum_sig_leading_zeros;
     let is_sum_zero = is_sum_zero || sum_sig_leading_zeros >= sum_exp;
     sum_exp = sum_exp.wrapping_sub(sum_sig_leading_zeros);
-
-    // Remove hidden bit from sum
-    let sum_sig = sum_sig & ((1 << format.num_sig_bits) - 1);
 
     if is_inf {
         Value::from_comps(sum_sign, exp_max, 0, format.clone())
@@ -83,6 +78,8 @@ pub fn addition(source1: Value, source2: Value) -> Value {
         // TODO: Handle sign properly (or not? :) )
         Value::from_comps(false, 0, 0, format.clone())
     } else {
+        // Remove hidden bit from sum
+        let sum_sig = sum_sig & ((1 << format.num_sig_bits) - 1);
         Value::from_comps(sum_sign, sum_exp, sum_sig, format.clone())
     }
 }
