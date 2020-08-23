@@ -16,6 +16,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
 
     let format = &source1.format;
 
+    // Propagate (replace!) NaNs
     let sig_quiet_bit = 1 << (format.num_sig_bits - 1);
     let quiet_nan = Value::from_comps(false, format.exp_max(), sig_quiet_bit, format.clone());
 

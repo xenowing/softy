@@ -9,7 +9,7 @@ pub fn multiplication(source1: Value, source2: Value) -> Value {
 
     let format = &source1.format;
 
-    // TODO: NaN propagation test(s)
+    // Propagate (replace!) NaNs
     let sig_quiet_bit = 1 << (format.num_sig_bits - 1);
     let quiet_nan = Value::from_comps(false, format.exp_max(), sig_quiet_bit, format.clone());
 
@@ -199,5 +199,45 @@ mod tests {
         let res = multiplication(a, b);
 
         assert_eq!(res.to_bits(), 0x00000000); // 0.0
+    }
+
+    #[test]
+    fn multiplication_nan() {
+        let f = Format::ieee754_single();
+
+        let a = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
+        let b = Value::from_comps(false, 0, 0, f.clone()); // 0.0
+
+        let res = multiplication(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
+
+        let a = Value::from_comps(false, 0, 0, f.clone()); // 0.0
+        let b = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
+
+        let res = multiplication(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
+
+        let a = Value::from_comps(false, 255, 0, f.clone()); // +inf
+        let b = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
+
+        let res = multiplication(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
+
+        let a = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
+        let b = Value::from_comps(true, 255, 0, f.clone()); // -inf
+
+        let res = multiplication(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
+
+        let a = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
+        let b = Value::from_comps(true, 255, 1338, f.clone()); // any NaN
+
+        let res = multiplication(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
     }
 }
