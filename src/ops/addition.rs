@@ -47,7 +47,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     // If sources' signs differ, negate rhs sig via two's complement
     let sig_including_hidden_and_overflow_bits_mask = (1 << (format.num_sig_bits + 2)) - 1;
     if source1.sign != source2.sign {
-        source2_sig = (!source2_sig + 1) & sig_including_hidden_and_overflow_bits_mask;
+        source2_sig = (!source2_sig).wrapping_add(1) & sig_including_hidden_and_overflow_bits_mask;
     }
 
     // Calculate sum
@@ -223,6 +223,34 @@ mod tests {
         let res = addition(a, b);
 
         assert_eq!(res.to_bits(), 0x00000000); // 0.0
+
+        let a = Value::from_comps(false, 127, 0, f.clone()); // 1.0
+        let b = Value::from_comps(false, 0, 0, f.clone()); // 0.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x3f800000); // 1.0
+
+        let a = Value::from_comps(false, 127, 0, f.clone()); // 1.0
+        let b = Value::from_comps(true, 0, 0, f.clone()); // -0.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x3f800000); // 1.0
+
+        let a = Value::from_comps(false, 0, 0, f.clone()); // 0.0
+        let b = Value::from_comps(false, 127, 0, f.clone()); // 1.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x3f800000); // 1.0
+
+        let a = Value::from_comps(true, 0, 0, f.clone()); // -0.0
+        let b = Value::from_comps(false, 127, 0, f.clone()); // 1.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x3f800000); // 1.0
 
         let a = Value::from_comps(true, 127, 0, f.clone()); // -1.0
         let b = Value::from_comps(false, 127, 0, f.clone()); // 1.0
