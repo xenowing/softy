@@ -10,7 +10,8 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     let mut source2 = flush_denormal_to_zero(source2);
 
     // Ensure source with greater exponent is lhs
-    if source1.exp < source2.exp {
+    // TODO: Is this sig part necessary?
+    if source1.exp < source2.exp || (source1.exp == source2.exp && source1.sig < source2.sig) {
         mem::swap(&mut source1, &mut source2);
     }
 
@@ -66,7 +67,12 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     // Check for infinity (exp overflow)
     let is_inf = sum_exp >= exp_max;
 
-    // TODO: Handle cancellation cases from negative rhs
+    // Handle cancellation cases from negative rhs
+    // TODO: Surely this can be simplified and/or perhaps merged with normalization above
+    let sum_sig_leading_zeros = sum_sig.leading_zeros() - (32 - (format.num_sig_bits + 1));
+    sum_sig <<= sum_sig_leading_zeros;
+    let is_sum_zero = is_sum_zero || sum_sig_leading_zeros >= sum_exp;
+    sum_exp = sum_exp.wrapping_sub(sum_sig_leading_zeros);
 
     // Remove hidden bit from sum
     let sum_sig = sum_sig & ((1 << format.num_sig_bits) - 1);
@@ -159,6 +165,20 @@ mod tests {
         let res = addition(a, b);
 
         assert_eq!(res.to_bits(), 0xc0000000); // -2.0
+
+        let a = Value::from_comps(true, 127, 1 << 22, f.clone()); // -1.5
+        let b = Value::from_comps(true, 127, 0, f.clone()); // -1.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0xc0200000); // -2.5
+
+        let a = Value::from_comps(true, 128, 1 << 22, f.clone()); // -3.0
+        let b = Value::from_comps(true, 128, 1 << 22, f.clone()); // -3.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0xc0c00000); // -6.0
     }
 
     #[test]
@@ -199,6 +219,13 @@ mod tests {
         let res = addition(a, b);
 
         assert_eq!(res.to_bits(), 0xc0000000); // -2.0
+
+        let a = Value::from_comps(false, 0, 1337, f.clone()); // any positive denormalized number
+        let b = Value::from_comps(true, 0, 1337, f.clone()); // any negative denormalized number
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x00000000); // 0.0
     }
 
     #[test]
@@ -225,6 +252,27 @@ mod tests {
         let res = addition(a, b);
 
         assert_eq!(res.to_bits(), 0x00000000); // 0.0
+
+        let a = Value::from_comps(false, 127, 0, f.clone()); // 1.0
+        let b = Value::from_comps(true, 127, 1 << 22, f.clone()); // -1.5
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0xbf000000); // -0.5
+
+        let a = Value::from_comps(true, 127, 1 << 22, f.clone()); // -1.5
+        let b = Value::from_comps(false, 127, 0, f.clone()); // 1.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0xbf000000); // -0.5
+
+        let a = Value::from_comps(false, 142, 0, f.clone()); // 32768.0
+        let b = Value::from_comps(true, 142, 1 << 6, f.clone()); // -32768.25
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0xbe800000); // -0.25
     }
 
     #[test]
@@ -254,6 +302,13 @@ mod tests {
 
         let a = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
         let b = Value::from_comps(true, 255, 0, f.clone()); // -inf
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
+
+        let a = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
+        let b = Value::from_comps(true, 255, 1338, f.clone()); // any NaN
 
         let res = addition(a, b);
 
