@@ -5,8 +5,6 @@ use std::mem;
 pub fn addition(source1: Value, source2: Value) -> Value {
     assert_eq!(source1.format, source2.format);
 
-    // TODO: Check for NaNs, handle signs, further input conditioning
-
     // Treat denormal input(s) as zero
     let mut source1 = flush_denormal_to_zero(source1);
     let mut source2 = flush_denormal_to_zero(source2);
@@ -17,6 +15,19 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     }
 
     let format = &source1.format;
+
+    let exp_max = (1 << format.num_exp_bits) - 1;
+    let sig_quiet_bit = 1 << (format.num_sig_bits - 1);
+    let quiet_nan = Value::from_comps(false, exp_max, sig_quiet_bit, format.clone());
+
+    if is_nan(&source1) || is_nan(&source2) {
+        return quiet_nan;
+    }
+
+    // TODO: Is this case really important?
+    if is_inf(&source1) && is_inf(&source2) && source1.sign != source2.sign {
+        return quiet_nan;
+    }
 
     // Decode full sigs
     let hidden_bit = 1 << format.num_sig_bits;
@@ -52,17 +63,34 @@ pub fn addition(source1: Value, source2: Value) -> Value {
         sum_sig >>= 1;
     }
 
+    // Check for infinity (exp overflow)
+    let is_inf = sum_exp >= exp_max;
+
     // TODO: Handle cancellation cases from negative rhs
 
     // Remove hidden bit from sum
     let sum_sig = sum_sig & ((1 << format.num_sig_bits) - 1);
 
-    if is_sum_zero {
-        // TODO: Handle sign properly
+    if is_inf {
+        Value::from_comps(sum_sign, exp_max, 0, format.clone())
+    } else if is_sum_zero {
+        // TODO: Handle sign properly (or not? :) )
         Value::from_comps(false, 0, 0, format.clone())
     } else {
         Value::from_comps(sum_sign, sum_exp, sum_sig, format.clone())
     }
+}
+
+fn is_nan(value: &Value) -> bool {
+    let format = &value.format;
+    let exp_max = (1 << format.num_exp_bits) - 1;
+    value.exp == exp_max && value.sig != 0
+}
+
+fn is_inf(value: &Value) -> bool {
+    let format = &value.format;
+    let exp_max = (1 << format.num_exp_bits) - 1;
+    value.exp == exp_max && value.sig == 0
 }
 
 fn flush_denormal_to_zero(value: Value) -> Value {
@@ -197,5 +225,93 @@ mod tests {
         let res = addition(a, b);
 
         assert_eq!(res.to_bits(), 0x00000000); // 0.0
+    }
+
+    #[test]
+    fn addition_nan() {
+        let f = Format::ieee754_single();
+
+        let a = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
+        let b = Value::from_comps(false, 0, 0, f.clone()); // 0.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
+
+        let a = Value::from_comps(false, 0, 0, f.clone()); // 0.0
+        let b = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
+
+        let a = Value::from_comps(false, 255, 0, f.clone()); // +inf
+        let b = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
+
+        let a = Value::from_comps(false, 255, 1337, f.clone()); // any NaN
+        let b = Value::from_comps(true, 255, 0, f.clone()); // -inf
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
+    }
+
+    #[test]
+    fn addition_inf() {
+        let f = Format::ieee754_single();
+
+        let a = Value::from_comps(false, 255, 0, f.clone()); // +inf
+        let b = Value::from_comps(false, 0, 0, f.clone()); // 0.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x7f800000); // +inf
+
+        let a = Value::from_comps(false, 255, 0, f.clone()); // +inf
+        let b = Value::from_comps(false, 127, 0, f.clone()); // 1.0
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x7f800000); // +inf
+
+        let a = Value::from_comps(false, 255, 0, f.clone()); // +inf
+        let b = Value::from_comps(false, 254, 0, f.clone()); // +max value
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x7f800000); // +inf
+
+        let a = Value::from_comps(false, 255, 0, f.clone()); // +inf
+        let b = Value::from_comps(false, 255, 0, f.clone()); // +inf
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x7f800000); // +inf
+
+        let a = Value::from_comps(true, 255, 0, f.clone()); // -inf
+        let b = Value::from_comps(true, 254, 0, f.clone()); // -max value
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0xff800000); // -inf
+
+        let a = Value::from_comps(true, 255, 0, f.clone()); // -inf
+        let b = Value::from_comps(true, 255, 0, f.clone()); // -inf
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0xff800000); // -inf
+
+        // TODO: Is this case really important?
+        let a = Value::from_comps(false, 255, 0, f.clone()); // +inf
+        let b = Value::from_comps(true, 255, 0, f.clone()); // -inf
+
+        let res = addition(a, b);
+
+        assert_eq!(res.to_bits(), 0x7fc00000); // NaN
     }
 }
