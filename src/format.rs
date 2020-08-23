@@ -30,6 +30,10 @@ impl Format {
     pub fn num_storage_bits(&self) -> u32 {
         1 + self.num_exp_bits + self.num_sig_bits
     }
+
+    pub fn exp_max(&self) -> u32 {
+        (1 << self.num_exp_bits) - 1
+    }
 }
 
 #[cfg(test)]
@@ -109,5 +113,20 @@ mod tests {
 
         let fp24 = Format::new(7, 16);
         assert_eq!(fp24.num_storage_bits(), 24);
+    }
+
+    #[test]
+    fn exp_max() {
+        let single = Format::ieee754_single();
+        assert_eq!(single.exp_max(), 255);
+
+        let half = Format::new(5, 10);
+        assert_eq!(half.exp_max(), 31);
+
+        let bfloat16 = Format::new(8, 7);
+        assert_eq!(bfloat16.exp_max(), 255);
+
+        let fp24 = Format::new(7, 16);
+        assert_eq!(fp24.exp_max(), 127);
     }
 }

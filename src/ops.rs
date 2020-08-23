@@ -16,9 +16,8 @@ pub fn addition(source1: Value, source2: Value) -> Value {
 
     let format = &source1.format;
 
-    let exp_max = (1 << format.num_exp_bits) - 1;
     let sig_quiet_bit = 1 << (format.num_sig_bits - 1);
-    let quiet_nan = Value::from_comps(false, exp_max, sig_quiet_bit, format.clone());
+    let quiet_nan = Value::from_comps(false, format.exp_max(), sig_quiet_bit, format.clone());
 
     if is_nan(&source1) || is_nan(&source2) {
         return quiet_nan;
@@ -64,7 +63,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     }
 
     // Check for infinity (exp overflow)
-    let is_inf = sum_exp >= exp_max;
+    let is_inf = sum_exp >= format.exp_max();
 
     // Normalize sum in case of cancellations from potentially-negative rhs
     let sum_sig_leading_zeros = sum_sig.leading_zeros() - (32 - (format.num_sig_bits + 1));
@@ -73,7 +72,7 @@ pub fn addition(source1: Value, source2: Value) -> Value {
     sum_exp = sum_exp.wrapping_sub(sum_sig_leading_zeros);
 
     if is_inf {
-        Value::from_comps(sum_sign, exp_max, 0, format.clone())
+        Value::from_comps(sum_sign, format.exp_max(), 0, format.clone())
     } else if is_sum_zero {
         // TODO: Handle sign properly (or not? :) )
         Value::from_comps(false, 0, 0, format.clone())
@@ -85,14 +84,12 @@ pub fn addition(source1: Value, source2: Value) -> Value {
 }
 
 fn is_nan(value: &Value) -> bool {
-    let format = &value.format;
-    let exp_max = (1 << format.num_exp_bits) - 1;
+    let exp_max = value.format.exp_max();
     value.exp == exp_max && value.sig != 0
 }
 
 fn is_inf(value: &Value) -> bool {
-    let format = &value.format;
-    let exp_max = (1 << format.num_exp_bits) - 1;
+    let exp_max = value.format.exp_max();
     value.exp == exp_max && value.sig == 0
 }
 
